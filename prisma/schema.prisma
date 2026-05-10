@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------
+// REFACTORED SCHEMA
+// ---------------------------------------------------------
+
+model Patient {
+  id           Int            @id @default(autoincrement())
+  fullName     String
+  // FIXED: Changed from plain string to DateTime for accurate calculations
+  dob          DateTime       @db.Date
+  // FIXED: Using Enum for strict data integrity instead of CHAR(1)
+  sex          Sex            @default(UNKNOWN)
+  address1     String?
+  address2     String?
+  city         String?
+  totalVisits  Int            @default(0)
+  // FIXED: Normalized repeating phone groups (ph1, ph2, ph3) into a separate relation
+  phones       PatientPhone[]
+  
+  appointments Appointment[]
+  billings     Billing[]
+}
+
+// FIXED: 1NF Violation resolved. Phones are now in their own table.
+model PatientPhone {
+  id        Int     @id @default(autoincrement())
+  number    String
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Department {
+  id      Int      @id @default(autoincrement())
+  name    String
+  hodName String?  
+  budget  Float
+
+  doctors Doctor[]
+}
+
+model Doctor {
+  id           Int          @id @default(autoincrement())
+  fullName     String
+  speciality   String
+  contactNo    String
+  joinDate     DateTime     @db.Date
+  salary       Float
+  isActive     Boolean      @default(true)
+  
+  // FIXED: Added proper Foreign Key constraint for department
+  departmentId Int
+  department   Department   @relation(fields: [departmentId], references: [id])
+
+  appointments Appointment[]
+}
+
+model Appointment {
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  status       ApptStatus @default(PENDING)
+  fee          Float
+  discount     Float    @default(0)
+  
+  // FIXED: Removed derived 'net_fee' column
+  // FIXED: Split 'room' into atomic columns
+  roomNumber   String
+  blockName    String
+
+  // FIXED: Removed duplicated patient_nm and doc_name (3NF Violation)
+  patientId    Int
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  
+  doctorId     Int
+  doctor       Doctor   @relation(fields: [doctorId], references: [id])
+}
+
+model Billing {
+  // FIXED: Added proper Primary Key constraint
+  billNo     String   @id @default(uuid())
+  svcCost    Float
+  taxPct     Float
+  paid       Float    @default(0)
+  // FIXED: Removed derived columns: tax_amt, grand_total, and balance
+  
+  // FIXED: Changed from plain string to DateTime
+  createdAt  DateTime @default(now())
+  createdBy  String   
+
+  patientId  Int
+  patient    Patient  @relation(fields: [patientId], references: [id])
+
+  // FIXED: Replaced comma-separated 'services' string with a Many-to-Many relation
+  services   BillingService[]
+}
+
+// FIXED: Created lookup table for services to fix the 1NF comma-separated list
+model CatalogService {
+  id          Int      @id @default(autoincrement())
+  serviceName String
+  basePrice   Float
+
+  billings    BillingService[]
+}
+
+// Many-to-Many Junction Table for Billing & Services
+model BillingService {
+  billNo      String
+  serviceId   Int
+
+  billing     Billing         @relation(fields: [billNo], references: [billNo], onDelete: Cascade)
+  service     CatalogService  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([billNo, serviceId])
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  NON_BINARY
+  UNKNOWN
+}
+
+enum ApptStatus {
+  PENDING
+  COMPLETE
+  CANCEL
+  HOLD
+  RESCHEDULED
+}
