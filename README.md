@@ -5,8 +5,8 @@
 **Instructor:** Ma’am Muzzamal Asghar  
 
 ### Team Members
-- Muhammad Hasnain (22F-3718) — Section SE-8A  
-- Asfand Ahmed (22F-3727) — Section SE-8A  
+- Muhammad Hasnain
+- Asfand Ahmed
 
 ---
 
